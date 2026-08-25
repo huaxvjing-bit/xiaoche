@@ -18,7 +18,7 @@ int main(void)
 	{
 		for(i = 1;i <= led_num; i++){
 		u8 k;
-			for(k = i; k <= led_num; k++ ){
+			for(k = 1; k <= led_num; k++ ){
 			if(k == i){
 			L_ws2812_rgb(k, WS_RED);
 			R_ws2812_rgb(k, WS_RED);
