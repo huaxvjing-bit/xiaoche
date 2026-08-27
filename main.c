@@ -1,9 +1,29 @@
 #include "stm32f10x.h"
 #include "sys.h"
 #include "motor.h"
+#include "encoder.h"
+#include "control_system.h"
+/**
+ * 1. PID 参数调节区 */
+PID_ParamTypeDef PID_Motor_L = { 7.5f, 0.7f, 0.35f };  // 左轮 PID
+PID_ParamTypeDef PID_Motor_R = { 7.5f, 0.7f, 0.35f };  // 右轮 PID
 
+float Pos_Sync_Kp = 0.45f; 
+
+/**
+ * 3. 目标速度与 1 米目标距离脉冲数
+ */
+#define TARGET_DISTANCE_PULSE  13700L  // 1米距离目标脉冲数
+
+#define FORWARD_SPEED   0.75f   // 前进速度: 0.75 转/秒
+#define BACKWARD_SPEED -0.75f   // 后退速度: -0.75 转/秒
+#define STOP_SPEED      0.0f    // 停止速度: 0.0 转/秒
+
+Motor_SpeedTypeDef Car_Speed = { 0.0f, 0.0f };
 int main(void)
 {
+    u16 i = 0;
+
     RCC->CSR |= 1 << 24;            // 清除复位标志位
     Stm32_Clock_Init(9);            // 外部时钟8Mhz 9倍频 8*9=72Mhz
     MY_NVIC_PriorityGroupConfig(2); // 中断优先级分组
@@ -14,36 +34,62 @@ int main(void)
     PWM_Init(7199, 9);              // 定时器TIM4初始化，PWM频率 = 72MHz / ((7199+1)*(9+1)) = 1kHz
     colorful_led_Init();            // 炫彩灯初始化
 
-    printf("QST先锋号鸿蒙智能小车 - 轮子运动控制程序启动\r\n");
+    Encoder_Init_TIM2();            // 初始化编码器（左电机 TIM2: PA0/PA1）
+    Encoder_Init_TIM3();            // 初始化编码器（右电机 TIM3: PA6/PA7）
 
-    /**
-     * 控制轮子运动周期循环：
-     * 设电机控制速度为 2500 (PWM满量程7199，较小速度平稳运行)
-     * 1. 1s 前进 (左轮正转, 右轮正转)
-     * 2. 1s 后退 (左轮反转, 右轮反转)
-     * 3. 1s 左轮前转, 右轮后转
-     * 4. 1s 左轮后转, 右轮前转
-     */
-    while(1)
+    PID_Reset();                    // 复位 PID 状态与电机输出
+
+    printf("QST Pioneer Car - High Precision Forward/Backward Motion Start\r\n");
+
+    while (1)
     {
-        // 1. 前进 1s (左轮正向 2500，右轮正向 2500)
-        printf("状态: 前进 1s\r\n");
-        Set_Pwm(2500, 2500);
-        delay_ms(1000);
+        // ------------------ 1. 前进 1 米 ------------------
+        printf("=== Status: Forward 1 Meter ===\r\n");
+        Read_Encoder(2);
+        Read_Encoder(3);
+        Distance_Reset();
+        PID_Reset();
 
-        // 2. 后退 1s (左轮反向 -2500，右轮反向 -2500)
-        printf("状态: 后退 1s\r\n");
-        Set_Pwm(-2500, -2500);
-        delay_ms(1000);
+        Car_Speed.target_speed_L = FORWARD_SPEED;
+        Car_Speed.target_speed_R = FORWARD_SPEED;
 
-        // 3. 左轮前转，右轮后转 1s (左轮正向 2500，右轮反向 -2500)
-        printf("状态: 左轮前转, 右轮后转 1s\r\n");
-        Set_Pwm(2500, -2500);
-        delay_ms(1000);
+        while (Get_Average_Distance_Pulse() < TARGET_DISTANCE_PULSE)
+        {
+            System_Control();
+            delay_ms(100);
+        }
 
-        // 4. 左轮后转，右轮前转 1s (左轮反向 -2500，右轮正向 2500)
-        printf("状态: 左轮后转, 右轮前转 1s\r\n");
-        Set_Pwm(-2500, 2500);
-        delay_ms(1000);
+        printf("=== Reached 1 Meter -> Status: Stop ===\r\n");
+        Car_Speed.target_speed_L = STOP_SPEED;
+        Car_Speed.target_speed_R = STOP_SPEED;
+        PID_Reset();
+        for (i = 0; i < 20; i++)
+        {
+            System_Control();
+            delay_ms(100);
+        }
+        printf("=== Status: Backward 1 Meter ===\r\n");
+        Read_Encoder(2);
+        Read_Encoder(3);
+        Distance_Reset();
+        PID_Reset();
+
+        Car_Speed.target_speed_L = BACKWARD_SPEED;
+        Car_Speed.target_speed_R = BACKWARD_SPEED;
+
+        while (Get_Average_Distance_Pulse() < TARGET_DISTANCE_PULSE)
+        {
+            System_Control();
+            delay_ms(100);
+        }
+        printf("=== Reached 1 Meter -> Status: Stop ===\r\n");
+        Car_Speed.target_speed_L = STOP_SPEED;
+        Car_Speed.target_speed_R = STOP_SPEED;
+        PID_Reset();
+        for (i = 0; i < 20; i++)
+        {
+            System_Control();
+            delay_ms(100);
+        }
     }
 }
