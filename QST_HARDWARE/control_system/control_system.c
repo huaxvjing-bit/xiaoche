@@ -137,6 +137,12 @@ int Rs_To_CPR(float rads)
 void Execute_Motion_Command(const char *cmd, u8 len)
 {
     u8 i;
+    int fwd_count = 0;
+    int back_count = 0;
+    int left_count = 0;
+    int right_count = 0;
+    int net_longitudinal = 0;
+    int net_lateral = 0;
     float sum_L = 0.0f;
     float sum_R = 0.0f;
 
@@ -154,44 +160,106 @@ void Execute_Motion_Command(const char *cmd, u8 len)
         }
     }
 
-    /* Superposition of motion vectors */
+    /* Extract and count direction key events */
     for (i = 0; i < len; i++)
     {
         switch (cmd[i])
         {
-            case '1': /* Forward: Left +1, Right +1 */
+            case '1': /* Forward */
             case 'w':
             case 'W':
             case 'F':
-                sum_L += 1.0f;
-                sum_R += 1.0f;
+                fwd_count++;
                 break;
 
-            case '2': /* Backward: Left -1, Right -1 */
+            case '2': /* Backward */
             case 's':
             case 'B':
-                sum_L -= 1.0f;
-                sum_R -= 1.0f;
+            case 'b':
+                back_count++;
                 break;
 
-            case '3': /* Left Turn: Left 0, Right +1 */
+            case '3': /* Left Turn */
             case 'a':
             case 'A':
             case 'L':
-                sum_L += 0.0f;
-                sum_R += 1.0f;
+            case 'l':
+                left_count++;
                 break;
 
-            case '4': /* Right Turn: Left +1, Right 0 */
+            case '4': /* Right Turn */
             case 'd':
             case 'D':
             case 'R':
-                sum_L += 1.0f;
-                sum_R += 0.0f;
+            case 'r':
+                right_count++;
                 break;
 
             default:
                 break;
+        }
+    }
+
+    net_longitudinal = fwd_count - back_count;
+    net_lateral = left_count - right_count;
+
+    /* Calculate directional speeds with kinematic consistency */
+    if (net_longitudinal > 0)
+    {
+        /* 前进运动: 1=单倍速前进, 11=双倍速前进, 13=左前, 14=右前 */
+        if (net_lateral > 0)       /* 左前 (如 13: 左轮=1, 右轮=1+1=2) */
+        {
+            sum_L = (float)net_longitudinal;
+            sum_R = (float)net_longitudinal + (float)net_lateral;
+        }
+        else if (net_lateral < 0)  /* 右前 (如 14: 左轮=1+1=2, 右轮=1) */
+        {
+            sum_L = (float)net_longitudinal + (float)(-net_lateral);
+            sum_R = (float)net_longitudinal;
+        }
+        else                       /* 直行前进 (如 1: 左轮=1,右轮=1; 11: 左轮=2,右轮=2) */
+        {
+            sum_L = (float)net_longitudinal;
+            sum_R = (float)net_longitudinal;
+        }
+    }
+    else if (net_longitudinal < 0)
+    {
+        /* 后退运动: 2=单倍速后退, 22=双倍速后退, 23=左后, 24=右后 */
+        int abs_back = -net_longitudinal;
+        if (net_lateral > 0)       /* 左后 (如 23: 左轮=-1, 右轮=-1-1=-2, 与13弧线对称) */
+        {
+            sum_L = -(float)abs_back;
+            sum_R = -(float)(abs_back + net_lateral);
+        }
+        else if (net_lateral < 0)  /* 右后 (如 24: 左轮=-1-1=-2, 右轮=-1, 与14弧线对称) */
+        {
+            sum_L = -(float)(abs_back + (-net_lateral));
+            sum_R = -(float)abs_back;
+        }
+        else                       /* 直行后退 (如 2: 左轮=-1,右轮=-1; 22: 左轮=-2,右轮=-2) */
+        {
+            sum_L = -(float)abs_back;
+            sum_R = -(float)abs_back;
+        }
+    }
+    else
+    {
+        /* 无前后分量时的转向 (如 3: 纯左转, 4: 纯右转) */
+        if (net_lateral > 0)       /* 纯左转 */
+        {
+            sum_L = 0.0f;
+            sum_R = (float)net_lateral;
+        }
+        else if (net_lateral < 0)  /* 纯右转 */
+        {
+            sum_L = (float)(-net_lateral);
+            sum_R = 0.0f;
+        }
+        else
+        {
+            sum_L = 0.0f;
+            sum_R = 0.0f;
         }
     }
 

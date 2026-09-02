@@ -33,6 +33,7 @@ volatile u8 Remote_Cmd_Received = 0;
 static char Cmd_Buffer[32];
 static u8   Cmd_Len = 0;
 
+
 void uart_init(u32 bound)
 {
     GPIO_InitTypeDef GPIO_InitStructure;
@@ -95,7 +96,7 @@ void USART1_IRQHandler(void)
         {
             Execute_Motion_Command("0", 1);
             Cmd_Len = 0;
-        }
+                    }
         else if (Res >= '1' && Res <= '4')
         {
             if (Cmd_Len < sizeof(Cmd_Buffer) - 1)
@@ -109,7 +110,7 @@ void USART1_IRQHandler(void)
             {
                 Execute_Motion_Command(Cmd_Buffer, Cmd_Len);
                 Cmd_Len = 0;
-            }
+                            }
         }
 	}
 
@@ -124,7 +125,7 @@ void USART1_IRQHandler(void)
         {
             Execute_Motion_Command(Cmd_Buffer, Cmd_Len);
             Cmd_Len = 0;
-        }
+                    }
     }
 }
 #endif
