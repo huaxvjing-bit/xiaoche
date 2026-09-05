@@ -1,4 +1,4 @@
-#include "control_system.h"
+Ôªø#include "control_system.h"
 
 /* Encoders */
 int L_coder = 0, R_coder = 0;
@@ -206,18 +206,18 @@ void Execute_Motion_Command(const char *cmd, u8 len)
     /* Calculate directional speeds with kinematic consistency */
     if (net_longitudinal > 0)
     {
-        /* «∞Ω¯‘À∂Ø: 1=µ•±∂ÀŸ«∞Ω¯, 11=À´±∂ÀŸ«∞Ω¯, 13=◊Û«∞, 14=”“«∞ */
-        if (net_lateral > 0)       /* ◊Û«∞ (»Á 13: ◊Û¬÷=1, ”“¬÷=1+1=2) */
+        /* ÂâçËøõËøêÂä®: 1=ÂçïÂÄçÈÄüÂâçËøõ, 11=ÂèåÂÄçÈÄüÂâçËøõ, 13=Â∑¶Ââç, 14=Âè≥Ââç */
+        if (net_lateral > 0)       /* Â∑¶Ââç (Â¶Ç 13: Â∑¶ËΩÆ=1, Âè≥ËΩÆ=1+1=2) */
         {
             sum_L = (float)net_longitudinal;
             sum_R = (float)net_longitudinal + (float)net_lateral;
         }
-        else if (net_lateral < 0)  /* ”“«∞ (»Á 14: ◊Û¬÷=1+1=2, ”“¬÷=1) */
+        else if (net_lateral < 0)  /* Âè≥Ââç (Â¶Ç 14: Â∑¶ËΩÆ=1+1=2, Âè≥ËΩÆ=1) */
         {
             sum_L = (float)net_longitudinal + (float)(-net_lateral);
             sum_R = (float)net_longitudinal;
         }
-        else                       /* ÷±––«∞Ω¯ (»Á 1: ◊Û¬÷=1,”“¬÷=1; 11: ◊Û¬÷=2,”“¬÷=2) */
+        else                       /* Áõ¥Ë°åÂâçËøõ (Â¶Ç 1: Â∑¶ËΩÆ=1,Âè≥ËΩÆ=1; 11: Â∑¶ËΩÆ=2,Âè≥ËΩÆ=2) */
         {
             sum_L = (float)net_longitudinal;
             sum_R = (float)net_longitudinal;
@@ -225,19 +225,19 @@ void Execute_Motion_Command(const char *cmd, u8 len)
     }
     else if (net_longitudinal < 0)
     {
-        /* ∫ÛÕÀ‘À∂Ø: 2=µ•±∂ÀŸ∫ÛÕÀ, 22=À´±∂ÀŸ∫ÛÕÀ, 23=◊Û∫Û, 24=”“∫Û */
+        /* ÂêéÈÄÄËøêÂä®: 2=ÂçïÂÄçÈÄüÂêéÈÄÄ, 22=ÂèåÂÄçÈÄüÂêéÈÄÄ, 23=Â∑¶Âêé, 24=Âè≥Âêé */
         int abs_back = -net_longitudinal;
-        if (net_lateral > 0)       /* ◊Û∫Û (»Á 23: ◊Û¬÷=-1, ”“¬÷=-1-1=-2, ”Î13ª°œﬂ∂‘≥∆) */
+        if (net_lateral > 0)       /* Â∑¶Âêé (Â¶Ç 23: Â∑¶ËΩÆ=-1, Âè≥ËΩÆ=-1-1=-2, ‰∏é13ÂºßÁ∫øÂØπÁß∞) */
         {
             sum_L = -(float)abs_back;
             sum_R = -(float)(abs_back + net_lateral);
         }
-        else if (net_lateral < 0)  /* ”“∫Û (»Á 24: ◊Û¬÷=-1-1=-2, ”“¬÷=-1, ”Î14ª°œﬂ∂‘≥∆) */
+        else if (net_lateral < 0)  /* Âè≥Âêé (Â¶Ç 24: Â∑¶ËΩÆ=-1-1=-2, Âè≥ËΩÆ=-1, ‰∏é14ÂºßÁ∫øÂØπÁß∞) */
         {
             sum_L = -(float)(abs_back + (-net_lateral));
             sum_R = -(float)abs_back;
         }
-        else                       /* ÷±––∫ÛÕÀ (»Á 2: ◊Û¬÷=-1,”“¬÷=-1; 22: ◊Û¬÷=-2,”“¬÷=-2) */
+        else                       /* Áõ¥Ë°åÂêéÈÄÄ (Â¶Ç 2: Â∑¶ËΩÆ=-1,Âè≥ËΩÆ=-1; 22: Â∑¶ËΩÆ=-2,Âè≥ËΩÆ=-2) */
         {
             sum_L = -(float)abs_back;
             sum_R = -(float)abs_back;
@@ -245,13 +245,13 @@ void Execute_Motion_Command(const char *cmd, u8 len)
     }
     else
     {
-        /* Œﬁ«∞∫Û∑÷¡ø ±µƒ◊™œÚ (»Á 3: ¥ø◊Û◊™, 4: ¥ø”“◊™) */
-        if (net_lateral > 0)       /* ¥ø◊Û◊™ */
+        /* Êó†ÂâçÂêéÂàÜÈáèÊó∂ÁöÑËΩ¨Âêë (Â¶Ç 3: Á∫ØÂ∑¶ËΩ¨, 4: Á∫ØÂè≥ËΩ¨) */
+        if (net_lateral > 0)       /* Á∫ØÂ∑¶ËΩ¨ */
         {
             sum_L = 0.0f;
             sum_R = (float)net_lateral;
         }
-        else if (net_lateral < 0)  /* ¥ø”“◊™ */
+        else if (net_lateral < 0)  /* Á∫ØÂè≥ËΩ¨ */
         {
             sum_L = (float)(-net_lateral);
             sum_R = 0.0f;
@@ -277,6 +277,10 @@ void Execute_Motion_Command(const char *cmd, u8 len)
 /* System Control Cycle */
 void System_Control(void)
 {
+    static u8 Direction_Interlock = 0;
+    static u8 Interlock_Cycles = 0;
+    static float Last_Applied_L = 0.0f;
+    static float Last_Applied_R = 0.0f;
     int Base_TageA = 0;
     int Base_TageB = 0;
     int Real_TageA = 0;
@@ -301,6 +305,16 @@ void System_Control(void)
 
         if (Car_Speed.target_speed_L == 0.0f) { Integral_A = 0.0f; Error_prev_A = 0.0f; }
         if (Car_Speed.target_speed_R == 0.0f) { Integral_B = 0.0f; Error_prev_B = 0.0f; }
+    }
+
+    /* 3. ÊñπÂêë‰∫íÈîÅÔºöÊç¢ÂêëÊó∂ÂÖà‰øùÊåÅ‰∏Ä‰∏™100msÈõ∂ÈÄüÂë®Êúü */
+    if ((Last_Applied_L > 0.0f && Car_Speed.target_speed_L < 0.0f) || (Last_Applied_L < 0.0f && Car_Speed.target_speed_L > 0.0f) || (Last_Applied_R > 0.0f && Car_Speed.target_speed_R < 0.0f) || (Last_Applied_R < 0.0f && Car_Speed.target_speed_R > 0.0f)) {
+        Direction_Interlock = 1; Interlock_Cycles = 1; Car_Speed.target_speed_L = 0.0f; Car_Speed.target_speed_R = 0.0f; PID_Reset();
+    }
+    if (Direction_Interlock) {
+        Set_Pwm(0, 0); Last_Applied_L = 0.0f; Last_Applied_R = 0.0f;
+        if (Interlock_Cycles > 0) { Interlock_Cycles--; return; }
+        Direction_Interlock = 0;
     }
 
     /* 3. Convert target rps to CPR pulses */
@@ -337,6 +351,8 @@ void System_Control(void)
 
     /* 6. Output PWM */
     Set_Pwm(Motor_A, Motor_B);
+    Last_Applied_L = Car_Speed.target_speed_L;
+    Last_Applied_R = Car_Speed.target_speed_R;
 }
 
 /* Brake */
@@ -428,3 +444,7 @@ void Turn_Right(long pulse, float speed)
         delay_ms(100);
     }
 }
+
+
+
+

@@ -1,4 +1,4 @@
-#ifndef __CONTROL_SYSTEM_H
+﻿#ifndef __CONTROL_SYSTEM_H
 #define __CONTROL_SYSTEM_H
 
 #include "stm32f10x.h"
@@ -7,8 +7,8 @@
 #include "motor.h"
 #include "delay.h"
 
-/* Speed Base Unit (rps) */
-#define BASE_SPEED_UNIT        0.70f
+/* Speed Base Unit: 降速50% (原0.70rps -> 0.35rps, 约1~1.5cm/s 超稳低速) */
+#define BASE_SPEED_UNIT        0.35f
 
 /* PID Structure */
 typedef struct {
@@ -54,3 +54,4 @@ void Turn_Right(long pulse, float speed);
 void Car_Brake(u16 brake_duration_ms);
 
 #endif
+
