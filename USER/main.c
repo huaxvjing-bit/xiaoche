@@ -1,106 +1,56 @@
 #include "stm32f10x.h"
 #include "sys.h"
-#include "motor.h"
-#include "encoder.h"
-#include "control_system.h"
-#include "colorful_led.h"
-#include "cliff_sensor.h"
 #include "usart.h"
 #include "delay.h"
+#include "motor.h"
+#include "encoder.h"
+#include "colorful_led.h"
+#include "control_system.h"
+#include "line_tracking.h"
 #include <stdio.h>
 
-/**
- * 1. PID ²ÎÊýÓëÍ¬²½ÅäÖÃ
- */
-PID_ParamTypeDef PID_Motor_L = { 7.5f, 0.7f, 0.35f };  // ×óÂÖ PID
-PID_ParamTypeDef PID_Motor_R = { 7.5f, 0.7f, 0.35f };  // ÓÒÂÖ PID
-float Pos_Sync_Kp = 0.45f;                             // Ö±ÏßÍ¬²½¾ÀÆ«ÏµÊý
-
-/**
- * 2. ÔË¶¯Âö³åÓë±ÜÏÕ¾àÀë¶¨Òå
- */
-#define PULSE_1_METER          13700L   // 1Ã×¾àÀëÄ¿±êÂö³åÊý
-#define PULSE_BACK_10CM        1370L    // ±ÜÏÕºóÍË10cmÂö³åÊý (13700 / 10)
-#define SPEED_SAFETY_BACK      0.60f    // µøÂä³·ÍËËÙ¶È
-#define ACTION_INTERVAL_MS     500      // ¶¯×÷Í£¶ÙÊ±¼ä
-
-/**
- * 3. ´®¿ÚÍ¨ÐÅ²¨ÌØÂÊ: ÉèÖÃÎª°åÔØ±ê×¼ 115200 bps
- */
-#define UART_COMM_BAUDRATE     115200
-
+/* PID å‚æ•° (å¾…å®žè½¦æ ‡å®š) */
+PID_ParamTypeDef PID_Motor_L = { 7.5f, 0.7f, 0.35f };
+PID_ParamTypeDef PID_Motor_R = { 7.5f, 0.7f, 0.35f };
 Motor_SpeedTypeDef Car_Speed = { 0.0f, 0.0f };
+float Pos_Sync_Kp = 0.45f;
 
-/**
- * @brief  ·ÀµøÂä±ÜÏÕ´¦Àíº¯Êý (³µÍ·Ðü¿ÕÊ±´¥·¢¼±É²Óë¶¨¾àºóÍË10cm)
- */
-void Safe_Retreat_Handler(void)
-{
-    // 1. Á¢¼´Ç¿ÖÆ¼±É²
-    Set_Pwm(0, 0);
-    Car_Speed.target_speed_L = 0.0f;
-    Car_Speed.target_speed_R = 0.0f;
-    PID_Reset();
-    delay_ms(100);
-
-    // 2. ±Õ»·¾«×¼ºóÍË 10cm
-    Move_Backward(PULSE_BACK_10CM, SPEED_SAFETY_BACK);
-
-    // 3. ×èÄáÉ²³µÍ£ÎÈ
-    Car_Brake(ACTION_INTERVAL_MS);
-
-    // 4. ÖØÖÃÄ¿±êËÙ¶ÈÎª 0 (¾²Ö¹´ýÃü)
-    Car_Speed.target_speed_L = 0.0f;
-    Car_Speed.target_speed_R = 0.0f;
-    PID_Reset();
-}
+#define UART_COMM_BAUDRATE 115200U
 
 int main(void)
 {
-    /* Ó²¼þµ×²ãÓëÍâÉè³õÊ¼»¯ */
-    RCC->CSR |= 1 << 24;            // Çå³ý¸´Î»±êÖ¾Î»
-    Stm32_Clock_Init(9);            // Íâ²¿Ê±ÖÓ8Mhz 9±¶Æµ 8*9=72Mhz
-    MY_NVIC_PriorityGroupConfig(2); // ÖÐ¶ÏÓÅÏÈ¼¶·Ö×é
-    
-    // ³õÊ¼»¯´®¿Ú1 (PA9/PA10 ²ÉÓÃ 115200 ¸ßËÙ±ê×¼²¨ÌØÂÊ)
-    uart_init(UART_COMM_BAUDRATE);  
-    
-    JTAG_Set(JTAG_SWD_DISABLE);     // ¹Ø±ÕJTAG½Ó¿Ú
-    JTAG_Set(SWD_ENABLE);           // ´ò¿ªSWDµ÷ÊÔ½Ó¿Ú
+    u8 led_tick = 0U;
 
-    PWM_Init(7199, 9);              // TIM4 PWM³õÊ¼»¯ (PB6/PB7, 1kHz)
-    colorful_led_Init();            // ìÅ²ÊµÆ³õÊ¼»¯
-    Encoder_Init_TIM2();            // ±àÂëÆ÷³õÊ¼»¯ (×óÂÖ TIM2: PA0/PA1)
-    Encoder_Init_TIM3();            // ±àÂëÆ÷³õÊ¼»¯ (ÓÒÂÖ TIM3: PA6/PA7)
-    Cliff_Sensor_Init();            // ³µÍ· TCRT5000 Ì½Í·³õÊ¼»¯ (PA11/PA12)
-    
-    // ³õÊ¼×´Ì¬Ç¿ÖÆËø¶¨Îª 0£¬ÉÏµç¾ø¶Ô¾²Ö¹
-    PID_Reset();
-    Car_Speed.target_speed_L = 0.0f;
-    Car_Speed.target_speed_R = 0.0f;
+    RCC->CSR |= 1 << 24;
+    Stm32_Clock_Init(9);
+    MY_NVIC_PriorityGroupConfig(2);
+
+    uart_init(UART_COMM_BAUDRATE);
+    PWM_Init(7199, 9);
+    Encoder_Init_TIM2();
+    Encoder_Init_TIM3();
+
+    /* å½©ç¯åˆå§‹åŒ– */
+    colorful_led_Init();
+    Ring_Flowing_Led_Init();
+
     Set_Pwm(0, 0);
+    Line_Tracking_Init();
 
-    Ring_Flowing_Led_Init();        // 12µÆ»·ÐÎºì°×½»ÌæÁ÷Ë®µÆ³õÊ¼»¯Æô¶¯
-    delay_ms(1000);                 // ÉÏµçÎÈÌ¬µÈ´ý
-
-    /*
-     * Ö÷Ñ­»·£º·ÀµøÂäÊµÊ±ÊØ»¤ + À¶ÑÀ/ºèÃÉËÙ¶È±Õ»·ÏìÓ¦ (100msÖÜÆÚ£¬Óë PID OverFlowTime ÑÏ¸ñ¶ÔÆë)
-     */
+    delay_ms(500);
     while (1)
     {
-        // 1. ×î¸ßÓÅÏÈ¼¶°²È«ÊØ»¤£º³µÍ·Ì½Í· (PA11/PA12) Ðü¿Õ¼ì²â
-        if (Check_Is_Cliff())
+        /* 10ms äº‹ä»¶é©±åŠ¨å¾ªè¿¹é—­çŽ¯ */
+        Line_Tracking_Task();
+
+        /* å½©ç¯ç»´æŠ¤ (100ms) */
+        led_tick++;
+        if (led_tick >= 10)
         {
-            Safe_Retreat_Handler(); // Á¢¼´ºóÍË 10cm ±ÜÏÕ
-        }
-        else
-        {
-            // 2. Õý³£×´Ì¬£ºÖ´ÐÐËÙ¶È±Õ»· (ÊµÊ±ÏìÓ¦´®¿ÚÏÂ·¢µÄÖ¸Áî)
-            System_Control();
+            led_tick = 0;
+            Ring_Flowing_Led_Process();
         }
 
-        Ring_Flowing_Led_Process(); // 12µÆÁ÷Ë®µÆÆ½ÐÐÔË×÷(Ã¿1sÇÐ»»Ò»´Î)
-
-        delay_ms(100); // 100ms ²ÉÑùÖÜÆÚ£¬Óë PID CPR ×ª»»¾«È·¶ÔÆë
+        delay_ms(10);
     }
 }
